@@ -1,0 +1,84 @@
+﻿using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using UnityEngine;
+using UnityEngine.Serialization;
+
+public class ItemFallEvent : MonoBehaviour
+{
+    public static ItemFallEvent Instance { get; private set; }
+    public TaskCompletionSource<bool> CompletionSource;
+
+    private Tile _source;
+    private Tile _destination;
+    private List<Tile> _pathToDestination;
+
+    [FormerlySerializedAs("AnimationSpeed")]
+    public float animationSpeed = 1f;
+
+    private void Awake()
+    {
+        Instance = this;
+        _pathToDestination = new List<Tile>();
+    }
+
+    public async Task CommenceFall(List<Tile> pathToDestination)
+    {
+        await BoardController.Instance.DisableInteraction();
+        _source = pathToDestination.First();
+        _destination = pathToDestination.Last();
+        _pathToDestination = pathToDestination;
+        await Fall();
+        await BoardController.Instance.EnableInteraction();
+        CompletionSource = null;
+    }
+
+    private async Task Fall()
+    {
+        CompletionSource = new TaskCompletionSource<bool>();
+        for (var i = 0; i < _pathToDestination.Count - 1; i++)
+        {
+            var source = _pathToDestination[i];
+            var destination = _pathToDestination[i + 1];
+            StartCoroutine(FallAnimation(source, destination, CompletionSource));
+            await CompletionSource.Task;
+        }
+
+        var srcIcon = _source.tileIcon;
+        var destIcon = _destination.tileIcon;
+
+        var srcIconTransform = srcIcon.transform;
+        var destIconTransform = destIcon.transform;
+        
+        srcIconTransform.SetParent(_destination.transform);
+        destIconTransform.SetParent(_source.transform);
+
+        _destination.Item = _source.Item;
+        _source.Item = null;
+        
+        _source = null;
+        _destination = null;
+    }
+
+    private IEnumerator FallAnimation(Tile source, Tile destination, TaskCompletionSource<bool> completionSource)
+    {
+        var srcIconTransform = source.tileIcon.transform;
+        var destIconTransform = destination.tileIcon.transform;
+        float elapsedTime = 0;
+    
+        var srcIconPosition = srcIconTransform.position;
+    
+        while (elapsedTime < animationSpeed)
+        {
+            elapsedTime += Time.deltaTime;
+            var percentageComplete = elapsedTime / animationSpeed;
+            srcIconTransform.position = Vector3.Lerp(srcIconPosition, destIconTransform.position,
+                Mathf.SmoothStep(0, 1, percentageComplete));
+            yield return null;
+        }
+    
+        destIconTransform.position = srcIconPosition;
+        completionSource.SetResult(true);
+    }
+}

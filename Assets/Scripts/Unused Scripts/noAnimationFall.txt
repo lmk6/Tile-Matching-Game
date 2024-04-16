@@ -1,0 +1,49 @@
+﻿using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using UnityEngine;
+
+public class ItemFallEvent : MonoBehaviour
+{
+    public static ItemFallEvent Instance { get; private set; }
+
+    private Tile _source;
+    private Tile _destination;
+    private List<Tile> _pathToDestination;
+
+    public float animationSpeed = 1f;
+
+    private void Awake()
+    {
+        Instance = this;
+        _pathToDestination = new List<Tile>();
+    }
+
+    public async Task CommenceFall(List<Tile> pathToDestination)
+    {
+        await BoardController.Instance.DisableInteraction();
+        _source = pathToDestination.First();
+        _destination = pathToDestination.Last();
+        _pathToDestination = pathToDestination;
+        Fall();
+        await BoardController.Instance.EnableInteraction();
+    }
+
+    private void Fall()
+    {
+        var srcIcon = _source.tileIcon;
+        var destIcon = _destination.tileIcon;
+
+        var srcIconTransform = srcIcon.transform;
+        var destIconTransform = destIcon.transform;
+        
+        srcIconTransform.SetParent(_destination.transform);
+        destIconTransform.SetParent(_source.transform);
+
+        (destIconTransform.position, srcIconTransform.position) = (srcIconTransform.position, destIconTransform.position);
+
+        _destination.Item = _source.Item;
+        _source.Item = null;
+    }
+}
